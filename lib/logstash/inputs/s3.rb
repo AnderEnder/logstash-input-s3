@@ -59,7 +59,8 @@ class LogStash::Inputs::S3 < LogStash::Inputs::Base
 
   # Set the directory where logstash will store the tmp files before processing them.
   # default to the current OS temporary directory in linux /tmp/logstash
-  config :temporary_directory, :validate => :string, :default => File.join(Dir.tmpdir, "logstash")
+  # config :temporary_directory, :validate => :string, :default => File.join(Dir.tmpdir, "logstash")
+  config :temporary_directory, :validate => :string, :default => "/tmp/logstash"
 
   public
   def register
