@@ -51,6 +51,9 @@ class LogStash::Inputs::S3 < LogStash::Inputs::Base
   # Value is in seconds.
   config :interval, :validate => :number, :default => 60
 
+  # Ruby style regexp of keys to include files from the bucket (conflicts with exclude_pattern, overrides it)
+  config :include_pattern, :validate => :string, :default => nil
+
   # Ruby style regexp of keys to exclude from the bucket
   config :exclude_pattern, :validate => :string, :default => nil
 
@@ -297,6 +300,12 @@ class LogStash::Inputs::S3 < LogStash::Inputs::Base
       return true
     elsif (@backup_add_prefix && @backup_to_bucket == @bucket && filename =~ /^#{backup_add_prefix}/)
       return true
+    elsif not @include_pattern.nil?
+      if not (filename =~ Regexp.new(@include_pattern))
+        return true
+      else
+        return false
+      end
     elsif @exclude_pattern.nil?
       return false
     elsif filename =~ Regexp.new(@exclude_pattern)
