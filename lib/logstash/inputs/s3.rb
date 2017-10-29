@@ -62,6 +62,10 @@ class LogStash::Inputs::S3 < LogStash::Inputs::Base
   # config :temporary_directory, :validate => :string, :default => File.join(Dir.tmpdir, "logstash")
   config :temporary_directory, :validate => :string, :default => "/tmp/logstash"
 
+  # Ruby style regexp to extract keys and values from s3 file path
+  # Example: '(?<job>j-\d+)\/(?<cat>c-\d+)' with keys job and cat
+  config :metadata_pattern, :validate => :string, :default => nil
+
   public
   def register
     require "fileutils"
@@ -166,6 +170,7 @@ class LogStash::Inputs::S3 < LogStash::Inputs::Base
   def process_local_log(queue, filename, key)
     @logger.debug('Processing file', :filename => filename)
     metadata = {}
+    custom_meta = fetch_meta(key)
     # Currently codecs operates on bytes instead of stream.
     # So all IO stuff: decompression, reading need to be done in the actual
     # input and send as bytes to the codecs.
@@ -189,6 +194,9 @@ class LogStash::Inputs::S3 < LogStash::Inputs::Base
           @logger.debug('Event is metadata, updating the current cloudfront metadata', :event => event)
           update_metadata(metadata, event)
         else
+          if not custom_meta.nil?
+            update_event(event, custom_meta)
+          end
           decorate(event)
 
           event.set("cloudfront_version", metadata[:cloudfront_version]) unless metadata[:cloudfront_version].nil?
@@ -225,7 +233,14 @@ class LogStash::Inputs::S3 < LogStash::Inputs::Base
     line.start_with?('#Fields: ')
   end
 
-  private 
+  private
+  def update_event(event, meta)
+    meta.each do |key, value|
+      event.set(key, value)
+    end
+  end
+
+  private
   def update_metadata(metadata, event)
     line = event.get('message').strip
 
@@ -240,7 +255,7 @@ class LogStash::Inputs::S3 < LogStash::Inputs::Base
 
   private
   def read_file(filename, &block)
-    if gzip?(filename) 
+    if gzip?(filename)
       read_gzip_file(filename, block)
     else
       read_plain_file(filename, block)
@@ -275,9 +290,9 @@ class LogStash::Inputs::S3 < LogStash::Inputs::Base
   def gzip?(filename)
     filename.end_with?('.gz')
   end
-  
+
   private
-  def sincedb 
+  def sincedb
     @sincedb ||= if @sincedb_path.nil?
                     @logger.info("Using default generated file for the sincedb", :filename => sincedb_file)
                     SinceDB::File.new(sincedb_file)
@@ -292,6 +307,19 @@ class LogStash::Inputs::S3 < LogStash::Inputs::Base
   def sincedb_file
     File.join(ENV["HOME"], ".sincedb_" + Digest::MD5.hexdigest("#{@bucket}+#{@prefix}"))
   end
+
+  private
+  def fetch_meta(filename)
+    meta = {}
+    if not @metadata_pattern.nil?
+      r = Regex.new(@metadata_pattern)
+      m = r.match(filename)
+      m.names.each do |metakey|
+        meta[metakey] = m[metakey]
+      end
+    end
+    return meta
+  end # fetch_meta
 
   private
   def ignore_filename?(filename)
