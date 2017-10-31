@@ -146,7 +146,7 @@ class LogStash::Inputs::S3 < LogStash::Inputs::Base
       if stop?
         break
       else
-        @logger.debug("S3 input processing", :bucket => @bucket, :key => key)
+        @logger.info("S3 input processing", :bucket => @bucket, :key => key)
         process_log(queue, key)
       end
     end
