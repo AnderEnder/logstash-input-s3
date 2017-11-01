@@ -312,7 +312,7 @@ class LogStash::Inputs::S3 < LogStash::Inputs::Base
   def fetch_meta(filename)
     meta = {}
     if not @metadata_pattern.nil?
-      r = Regex.new(@metadata_pattern)
+      r = Regexp.new(@metadata_pattern)
       m = r.match(filename)
       m.names.each do |metakey|
         meta[metakey] = m[metakey]
